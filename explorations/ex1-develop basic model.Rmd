@@ -1,0 +1,229 @@
+---
+title: "CBA Final Project"
+author: "Ryan Anderson"
+output:
+  html_document:
+    toc: true          # Enable table of contents
+    toc_depth: 3       # Specify the depth of the TOC (e.g., 3 levels)
+    toc_float: true    # Make the table of contents float (optional)
+    code_folding: hide # Enable code folding (options: 'show' or 'hide')
+---
+
+## Setup
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+
+```{r}
+# Clean env
+rm(list = ls())
+
+# Load libs
+library(tidyverse)
+library(here)
+library(knitr)
+library(kableExtra)
+
+```
+
+
+## The model specification
+
+
+The main equations
+
+Usefulness of most recent plan at time t
+
+$$ u_{t+1} = r u_t $$
+$$ u_1 = 1 $$
+and u_t is reset back to 1 when a new plan is created.
+
+
+The time needed to complete the current "task" at period t.
+
+$$ D_t = B(1-pu_t) $$
+
+
+The amount of time needed to create a plan for a given scope (sigma). If the scope is 5, then the plan would apply for 5 periods, including the period it was created on.
+
+$$ L = c \sigma + k $$
+
+
+
+
+## Defining the Model Func
+
+```{r}
+
+run_model <- function(sim_periods, r, plan_scope, c, k, B, p, stochastic = FALSE, sd_r = 1, sd_c = 1, sd_k = 1, sd_B = 1, sd_p = 1) {
+  
+  # Initialize the vectors
+  working_time <- vector("numeric", length = sim_periods)
+  planning_time <- vector("numeric", length = sim_periods)
+  time_consumption <- vector("numeric", length = sim_periods)
+  plan_usefulness <- vector("numeric", length = sim_periods)
+  
+  # Get error terms if we are using a stochastic model
+  # We will want an error term for the r at each period
+  # We'll also need ones for getting D and L at any given time.
+  if (stochastic) {
+    error_r <- rnorm(sim_periods, mean = 0, sd = sd_r)
+    error_c <- rnorm(sim_periods, mean = 0, sd = sd_c)
+    error_k <- rnorm(sim_periods, mean = 0, sd = sd_k)
+    error_B <- rnorm(sim_periods, mean = 0, sd = sd_B)
+    error_p <- rnorm(sim_periods, mean = 0, sd = sd_p)
+  } else {
+    error_r <- rep(0, sim_periods)
+    error_c <- rep(0, sim_periods)
+    error_k <- rep(0, sim_periods)
+    error_B <- rep(0, sim_periods)
+    error_p <- rep(0, sim_periods)
+  }
+  
+  # Initialize the first period
+  # we assume that a plan is always developed in period 1
+  planning_time[1] <- (c + error_c[1]) * plan_scope + (k + error_k[1])
+  plan_usefulness[1] <- 1
+  
+  # We also complete the required workload in period 1 with a 100% useful plan
+  working_time[1] <- (B + error_B[1]) * (1 - (p + error_p[1]) * plan_usefulness[1])
+  
+  # Add working and planning time to get the total time consumption
+  time_consumption[1] <- working_time[1] + planning_time[1]
+  
+  # Start a counter so we know when to make the next plan
+  time_since_last_plan <- 0
+  
+  # browser()
+  
+  # Begin the loop
+  for (t in 2:sim_periods) {
+
+    
+    # Update the plan usefulness
+    plan_usefulness[t] <- plan_usefulness[t-1] * (r + error_r[t])
+    
+    # Update time counter
+    time_since_last_plan <- time_since_last_plan + 1
+    
+    # Develop a new plan if the scope is reached
+    if (time_since_last_plan == plan_scope) {
+      planning_time[t] <- (c + error_c[t]) * plan_scope + (k + error_k[t])
+      plan_usefulness[t] <- 1
+      time_since_last_plan <- 0
+    } else {
+      planning_time[t] <- 0
+    }
+    
+    # Update the time consumption with the current period's time demand
+    working_time[t] <- (B + error_B[t]) * (1 - (p+error_p[t]) * plan_usefulness[t])
+    
+    # Add working time and planning time to get total time consumption
+    time_consumption[t] <- planning_time[t] + working_time[t]
+    
+    # browser()
+  }
+  
+  # Return the results
+  return(data.frame(period = 1:sim_periods, time_consumption = time_consumption, plan_usefulness = plan_usefulness, working_time = working_time, planning_time = planning_time))
+  
+}
+```
+
+## Running the Model
+
+### Constants to Test With
+```{r}
+SIM_PERIODS <- 52 # if we use weeks as a period, this will let us simulate a 1 year long project
+PLAN_DECAY_RATE <- 0.9 # with 0.9, in 6 weeks, you get about 50% usefulness
+PLAN_SCOPE <- 4 # 4 week plan
+C <- 1 # one person-hour per week of plan drafting
+K <- 1 # one person-hour baseline of overhead for plan drafting
+B <- 40 # Baseline time demand for a week's worth of work on the project is 40 person hours
+P <- 0.2 # You can reduce the time demand by 20% at most by having a perfectly applicable plan.
+```
+
+### Running
+
+```{r}
+model_results <- run_model(SIM_PERIODS, PLAN_DECAY_RATE, PLAN_SCOPE, C, K, B, P)
+
+model_results %>% 
+  kable() %>% 
+  kable_styling(full_width = F)
+
+```
+
+## Visualization
+```{r}
+# Visualize the model results with ggplot2
+ggplot(model_results, aes(x = period, y = time_consumption)) +
+  geom_line() +
+  labs(title = "Time Consumption Over Weeks",
+       x = "Week",
+       y = "Person Hours") +
+  theme_minimal()
+
+
+# Now let's do a plot that has the 2 trends of working time and planning time
+model_results %>% 
+  gather(key = "time_type", value = "time", working_time, planning_time) %>% 
+  ggplot(aes(x = period, y = time, color = time_type)) +
+  geom_line() +
+  labs(title = "Working and Planning Time Over Weeks",
+       x = "Week",
+       y = "Person Hours") +
+  theme_minimal()
+
+```
+
+## Trying the Stochastic Version
+
+```{r}
+model_results_stochastic <- run_model(SIM_PERIODS, PLAN_DECAY_RATE, 8, C, K, B, P, stochastic = TRUE, sd_r = 0.1, sd_c = 0.1, sd_k = 1, sd_B = 1, sd_p = 0.1)
+
+model_results_stochastic %>% 
+  kable() %>% 
+  kable_styling(full_width = F)
+
+# viseualize
+ggplot(model_results_stochastic, aes(x = period, y = time_consumption)) +
+  geom_line() +
+  labs(title = "Time Consumption Over Weeks (Stochastic)",
+       x = "Week",
+       y = "Person Hours") +
+  theme_minimal()
+
+# Now let's do a plot that shows the total time consumption and puts vertical lines 
+# every single time a plan occurs
+# So if the plan scope is 8, we should see a vertical line every 8 weeks
+model_results_stochastic %>% 
+  ggplot(aes(x = period, y = time_consumption)) +
+  geom_line() +
+  geom_vline(xintercept = seq(8, SIM_PERIODS, 8)+1, linetype = "dashed") +
+  labs(title = "Time Consumption Over Weeks (Stochastic)",
+       x = "Week",
+       y = "Person Hours") +
+  theme_minimal()
+
+
+
+# Display result numbers in table: the total working time, planning time, and time consumption
+model_results_stochastic %>% 
+  summarise(total_working_time = sum(working_time),
+            total_planning_time = sum(planning_time),
+            total_time_consumption = sum(time_consumption)) %>% 
+  kable(col.names = c("Working Time", "Planning Time", "Total Time Consumption")) %>% 
+  kable_styling(full_width = F)
+
+
+
+```
+
+## Table of Parameter Values

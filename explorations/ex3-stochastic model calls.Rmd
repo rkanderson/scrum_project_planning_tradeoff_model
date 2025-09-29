@@ -1,0 +1,148 @@
+---
+title: "Stochastic Model Calls"
+author: "Ryan Anderson"
+output:
+  html_document:
+    toc: true          # Enable table of contents
+    toc_depth: 3       # Specify the depth of the TOC (e.g., 3 levels)
+    toc_float: true    # Make the table of contents float (optional)
+    code_folding: hide # Enable code folding (options: 'show' or 'hide')
+---
+
+Here we're gonna test stochastic model calls, we're gonna run them a bunch of times and extract key metrics.
+
+## Setup
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+
+```{r}
+# Clean env
+rm(list = ls())
+
+# Load libs
+library(tidyverse)
+library(here)
+library(knitr)
+library(kableExtra)
+
+```
+
+
+
+```{r}
+
+# call source() for scripts/model.R
+source(here("Final Project", "scripts", "model.R"))
+
+```
+
+## Running Model
+
+
+
+
+```{r}
+
+# Helper function to handle stochastic repetition analysis
+
+# run_stochastic_repetitions <- function(n_reps, SIM_PERIODS, PLAN_DECAY_RATE, PLAN_SCOPE, C, K, B, P) {
+#   results <- tibble()
+#   for (i in 1:n_reps) {
+#     model_results <- run_model(SIM_PERIODS, PLAN_DECAY_RATE, PLAN_SCOPE, C, K, B, P, 
+#                                stochastic = TRUE) %>% mutate(run = i)
+#     results <- bind_rows(results, model_results)
+#   }
+#   
+#   results_summary <- results %>% 
+#     group_by(run) %>% 
+#     summarize(total_time_consumption = sum(time_consumption), 
+#               total_working_time = sum(working_time), 
+#               total_planning_time = sum(planning_time)) %>% 
+#     summarize(mean_total_time_consumption = mean(total_time_consumption),
+#               mean_total_working_time = mean(total_working_time), 
+#               mean_total_planning_time = mean(total_planning_time))
+#   
+#   return(list(results = results, results_summary = results_summary))
+# }
+
+# Rewrite the function above, but have it accept parameters for the standard deviations as well
+run_stochastic_repetitions <- function(n_reps, SIM_PERIODS, PLAN_DECAY_RATE, PLAN_SCOPE, C, K, B, P, SD_R, SD_C, SD_K, SD_B, SD_P) {
+  results <- tibble()
+  for (i in 1:n_reps) {
+    model_results <- run_model(SIM_PERIODS, PLAN_DECAY_RATE, PLAN_SCOPE, C, K, B, P, 
+                               stochastic = TRUE, sd_r = SD_R, sd_c = SD_C, sd_k = SD_K, sd_B = SD_B, sd_p = SD_P) %>% mutate(run = i)
+    results <- bind_rows(results, model_results)
+  }
+  
+  results_summary <- results %>% 
+    group_by(run) %>% 
+    summarize(total_time_consumption = sum(time_consumption), 
+              total_working_time = sum(working_time), 
+              total_planning_time = sum(planning_time)) %>% 
+    summarize(mean_total_time_consumption = mean(total_time_consumption),
+              mean_total_working_time = mean(total_working_time), 
+              mean_total_planning_time = mean(total_planning_time))
+  
+  return(list(results = results, results_summary = results_summary))
+}
+
+
+
+```
+
+
+So we're going to use some more realistic estimates for parameters here
+
+```{r}
+
+# Constants to Test With
+SIM_PERIODS <- 25 # 15 weeks of actual work (like Bren GP timeline we begin working over 2.5 quarters)
+PLAN_DECAY_RATE <- 0.9 # with 0.9, in 6 weeks, you get about 50% usefulness. For sensititivity analysis can try with 0.95 and 0.85
+PLAN_SCOPE <- 25 # Plan that is meant to be used for 25 weeks
+
+C <- 14.4 # one person-hour per week of plan drafting. 
+K <- 40 # one person-hour baseline of overhead for plan drafting
+# ^ For Sensitivity analysis, I can try variants of C and K based on the percent of time we attribute to constant overrhead vs planning. 400 = 25C+K
+
+
+B <- 40 # Baseline time demand for a week's worth of work on the project is 40 person hours
+P <- 0.5 # You can reduce the time demand by 20% at most by having a perfectly applicable plan. Can try 0.75 and 0.25 in sensitivity analysis.
+
+# Let's also define some SD values for the stochastic model
+SD_R <- 0.2 
+SD_C <- 5
+SD_K <- 10
+SD_B <- 10
+SD_P <- 0.2
+
+```
+
+
+```{r}
+# Invoke the helper function to run this 100 times
+# results_list <- run_stochastic_repetitions(100, SIM_PERIODS, PLAN_DECAY_RATE, PLAN_SCOPE, C, K, B, P)
+results_list <- run_stochastic_repetitions(100, SIM_PERIODS, PLAN_DECAY_RATE, PLAN_SCOPE, C, K, B, P, SD_R, SD_C, SD_K, SD_B, SD_P)
+
+# Display the results_summary
+results_list$results_summary
+
+# Graph only the first run
+plot_model_run(results_list$results %>% filter(run == 1), PLAN_SCOPE)
+```
+
+## Under Current Parameters, what is the ideal planning scope?
+
+Without doing any sensitivity analysis yet, let's see what yields the best value?
+I'm going to try a scopes of 1, 2, 5, 25
+
+```{r}
+
+```
+

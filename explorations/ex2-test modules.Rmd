@@ -1,0 +1,117 @@
+---
+title: "CBA Final Project"
+author: "Ryan Anderson"
+output:
+  html_document:
+    toc: true          # Enable table of contents
+    toc_depth: 3       # Specify the depth of the TOC (e.g., 3 levels)
+    toc_float: true    # Make the table of contents float (optional)
+    code_folding: hide # Enable code folding (options: 'show' or 'hide')
+---
+
+## Setup
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+
+```{r}
+# Clean env
+rm(list = ls())
+
+# Load libs
+library(tidyverse)
+library(here)
+library(knitr)
+library(kableExtra)
+
+```
+
+
+
+```{r}
+
+# call source() for scripts/model.R
+source(here("Final Project", "scripts", "model.R"))
+
+```
+
+## Running the Model
+
+### Constants to Test With
+```{r}
+SIM_PERIODS <- 52 # if we use weeks as a period, this will let us simulate a 1 year long project
+PLAN_DECAY_RATE <- 0.9 # with 0.9, in 6 weeks, you get about 50% usefulness
+PLAN_SCOPE <- 4 # 4 week plan
+C <- 1 # one person-hour per week of plan drafting
+K <- 1 # one person-hour baseline of overhead for plan drafting
+B <- 40 # Baseline time demand for a week's worth of work on the project is 40 person hours
+P <- 0.2 # You can reduce the time demand by 20% at most by having a perfectly applicable plan.
+```
+
+### Running
+
+```{r}
+model_results <- run_model(SIM_PERIODS, PLAN_DECAY_RATE, PLAN_SCOPE, C, K, B, P)
+
+model_results %>% 
+  kable() %>% 
+  kable_styling(full_width = F)
+
+```
+
+## Visualization
+```{r}
+# Visualize the model results with ggplot2
+plot_model_run(model_results, PLAN_SCOPE)
+
+
+```
+
+## Trying the Stochastic Version
+
+```{r}
+# model_results_stochastic <- run_model(SIM_PERIODS, PLAN_DECAY_RATE, 8, C, K, B, P, stochastic = TRUE, sd_r = 0.1, sd_c = 0.1, sd_k = 1, sd_B = 1, sd_p = 0.1)
+# 
+# model_results_stochastic %>% 
+#   kable() %>% 
+#   kable_styling(full_width = F)
+# 
+# # viseualize
+# ggplot(model_results_stochastic, aes(x = period, y = time_consumption)) +
+#   geom_line() +
+#   labs(title = "Time Consumption Over Weeks (Stochastic)",
+#        x = "Week",
+#        y = "Person Hours") +
+#   theme_minimal()
+# 
+# # Now let's do a plot that shows the total time consumption and puts vertical lines 
+# # every single time a plan occurs
+# # So if the plan scope is 8, we should see a vertical line every 8 weeks
+# model_results_stochastic %>% 
+#   ggplot(aes(x = period, y = time_consumption)) +
+#   geom_line() +
+#   geom_vline(xintercept = seq(8, SIM_PERIODS, 8)+1, linetype = "dashed") +
+#   labs(title = "Time Consumption Over Weeks (Stochastic)",
+#        x = "Week",
+#        y = "Person Hours") +
+#   theme_minimal()
+# 
+# 
+# 
+# # Display result numbers in table: the total working time, planning time, and time consumption
+# model_results_stochastic %>% 
+#   summarise(total_working_time = sum(working_time),
+#             total_planning_time = sum(planning_time),
+#             total_time_consumption = sum(time_consumption)) %>% 
+#   kable(col.names = c("Working Time", "Planning Time", "Total Time Consumption")) %>% 
+#   kable_styling(full_width = F)
+# 
+
+
+```

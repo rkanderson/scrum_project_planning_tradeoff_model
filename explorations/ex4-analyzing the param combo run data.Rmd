@@ -1,0 +1,67 @@
+---
+title: "Analyzing big param combo dataset"
+author: "Ryan Anderson"
+output:
+  html_document:
+    toc: true          # Enable table of contents
+    toc_depth: 3       # Specify the depth of the TOC (e.g., 3 levels)
+    toc_float: true    # Make the table of contents float (optional)
+    code_folding: hide # Enable code folding (options: 'show' or 'hide')
+---
+
+Here we're gonna test stochastic model calls, we're gonna run them a bunch of times and extract key metrics.
+
+## Setup
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+
+```{r}
+# Clean env
+rm(list = ls())
+
+# Load libs
+library(tidyverse)
+library(here)
+library(knitr)
+library(kableExtra)
+
+# load data
+# Final Project/data/combinations_df.csv
+
+combinations_df <- read_csv(here("Final Project", "data", "combinations_df.csv"))
+
+
+
+```
+
+## Which planning scope is the best
+
+colnames
+ [1] "SIM_PERIODS"            "PLAN_DECAY_RATE"        "PLAN_SCOPE"            
+ [4] "C"                      "K"                      "B"                     
+ [7] "P"                      "SD_R"                   "SD_C"                  
+[10] "SD_K"                   "SD_B"                   "SD_P"                  
+[13] "total_time_consumption"
+
+
+In each of these scenarios, which plan_scope is the best?
+I need to find out how often each plan scope is the best in each scenario.
+
+```{r}
+best_plan_scope <- combinations_df %>% 
+  group_by(SIM_PERIODS, PLAN_DECAY_RATE, C, K, B, P, SD_R, SD_C, SD_K, SD_B, SD_P) %>% 
+  summarize(best_plan_scope = PLAN_SCOPE[which.min(total_time_consumption)])
+
+
+# Now get the relative percentages of how often each best_plan_scope appears
+best_plan_scope$best_plan_scope %>% table() %>% prop.table() %>% kable()
+
+```
+
