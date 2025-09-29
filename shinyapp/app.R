@@ -3,14 +3,15 @@ rm(list = ls())
 
 # Load required libraries
 library(shiny)
-library(here)
+# library(here)
 library(nloptr)
 library(tidyverse)
 library(shinydashboard)
 
 
 # Source the necessary scripts
-source(here("Final Project", "scripts", "model.R"))
+# source(here("Final Project", "scripts", "model.R"))
+source("model.R")
 
 # Default parameter values
 SIM_PERIODS <- 52 # if we use weeks as a period, this will let us simulate a 1 year long project
